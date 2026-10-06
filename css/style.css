@@ -1,0 +1,475 @@
+/* =========================================
+   OBSIDIAN FINANCE
+   V1.0 — Dashboard Interface
+   ========================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #080808;
+    color: #f2f2f2;
+    min-height: 100vh;
+}
+
+
+/* =========================================
+   TOP BAR
+   ========================================= */
+
+.topbar {
+    width: 100%;
+    padding: 28px 5%;
+    border-bottom: 1px solid #222;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.topbar h1 {
+    font-size: 22px;
+    letter-spacing: 3px;
+    font-weight: 700;
+}
+
+.topbar p {
+    margin-top: 7px;
+    color: #777;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+.date {
+    color: #888;
+    font-size: 12px;
+    letter-spacing: 2px;
+}
+
+
+/* =========================================
+   MAIN
+   ========================================= */
+
+main {
+    width: 90%;
+    max-width: 1400px;
+    margin: 40px auto;
+}
+
+section {
+    margin-bottom: 40px;
+}
+
+
+/* =========================================
+   HERO
+   ========================================= */
+
+.hero-card {
+    background: #101010;
+    border: 1px solid #242424;
+    padding: 35px;
+    border-radius: 10px;
+}
+
+.label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #777;
+}
+
+.hero-card h2 {
+    margin-top: 12px;
+    font-size: 42px;
+    letter-spacing: 1px;
+}
+
+.muted {
+    display: block;
+    margin-top: 8px;
+    color: #666;
+    font-size: 12px;
+}
+
+
+/* =========================================
+   SECTION HEADERS
+   ========================================= */
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header h3 {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #888;
+}
+
+
+/* =========================================
+   ACCOUNT CARDS
+   ========================================= */
+
+.account-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.account-card {
+    background: #101010;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 25px;
+    transition: 0.2s ease;
+}
+
+.account-card:hover {
+    border-color: #444;
+    transform: translateY(-2px);
+}
+
+.account-name {
+    display: block;
+    color: #777;
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 15px;
+}
+
+.account-card strong {
+    font-size: 24px;
+}
+
+
+/* =========================================
+   MONTHLY SUMMARY
+   ========================================= */
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.summary-card {
+    background: #101010;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.summary-card span {
+    display: block;
+    color: #777;
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+}
+
+.summary-card strong {
+    font-size: 22px;
+}
+
+
+/* =========================================
+   BUTTON
+   ========================================= */
+
+button {
+    background: #f2f2f2;
+    color: #080808;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+
+/* =========================================
+   TRANSACTION TABLE
+   ========================================= */
+
+.transaction-container {
+    background: #101010;
+    border: 1px solid #222;
+    border-radius: 10px;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+thead {
+    background: #151515;
+}
+
+th {
+    padding: 15px;
+    text-align: left;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: #666;
+    font-weight: normal;
+}
+
+td {
+    padding: 16px 15px;
+    border-top: 1px solid #202020;
+    font-size: 12px;
+    color: #bbb;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #555;
+}
+
+
+/* =========================================
+   FOOTER
+   ========================================= */
+
+footer {
+    text-align: center;
+    padding: 30px;
+    border-top: 1px solid #222;
+    color: #444;
+    font-size: 9px;
+    letter-spacing: 2px;
+}
+
+
+/* =========================================
+   MOBILE
+   ========================================= */
+
+@media (max-width: 700px) {
+
+    .topbar {
+        padding: 20px;
+    }
+
+    .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    main {
+        width: 92%;
+        margin-top: 25px;
+    }
+
+    .hero-card h2 {
+        font-size: 32px;
+    }
+
+    .account-grid,
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+/* =========================================
+   TRANSACTION MODAL
+   ========================================= */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.75);
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    z-index: 1000;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal {
+    width: 100%;
+    max-width: 500px;
+
+    max-height: 90vh;
+    overflow-y: auto;
+
+    background: #101010;
+
+    border: 1px solid #292929;
+
+    border-radius: 10px;
+
+    padding: 28px;
+
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+
+/* HEADER */
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    margin-bottom: 25px;
+}
+
+.modal-header h2 {
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+.modal-header p {
+    margin-top: 7px;
+
+    color: #666;
+
+    font-size: 11px;
+}
+
+.close-button {
+    background: transparent;
+
+    color: #777;
+
+    font-size: 25px;
+
+    padding: 0;
+
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.close-button:hover {
+    color: #fff;
+}
+
+
+/* FORM */
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #777;
+
+    font-size: 9px;
+
+    letter-spacing: 1.5px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+
+    padding: 13px;
+
+    background: #080808;
+
+    color: #eee;
+
+    border: 1px solid #292929;
+
+    border-radius: 5px;
+
+    outline: none;
+
+    font-size: 13px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: #555;
+}
+
+
+/* FORM BUTTONS */
+
+.form-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 25px;
+}
+
+.cancel-button {
+    background: #1b1b1b;
+
+    color: #aaa;
+
+    border: 1px solid #292929;
+}
+
+.save-button {
+    background: #f2f2f2;
+
+    color: #080808;
+}
+
+/* =========================================
+   TRANSACTION ACTION BUTTONS
+   ========================================= */
+
+.edit-btn,
+.delete-btn {
+    padding: 6px 9px;
+    font-size: 8px;
+    margin-right: 5px;
+}
+
+.edit-btn {
+    background: #202020;
+    color: #ccc;
+    border: 1px solid #333;
+}
+
+.delete-btn {
+    background: #151515;
+    color: #777;
+    border: 1px solid #292929;
+}
+
+.edit-btn:hover,
+.delete-btn:hover {
+    color: #fff;
+    border-color: #555;
+}
