@@ -1,0 +1,14 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Local data / backups
+*.json
+!data/.gitkeep
+
+# Logs
+*.log

@@ -1,1615 +1,295 @@
+import { loadState, saveState, exportState } from "./core/storage.js";
+import { uniqueName, validAmount } from "./core/validators.js";
+import { renderDashboard } from "./ui/dashboard.js";
+import { renderTransactions } from "./ui/transactions.js";
+import { renderBudgets } from "./ui/budgets.js";
+import { renderCharts } from "./charts/charts.js";
 
+let state = loadState();
+let itemMode = null;
+let editingTransactionId = null;
 
-/* =========================================================
-   OBSIDIAN FINANCE
-   Complete Manual Finance Engine
-   Version 1.2
-   ========================================================= */
+const $ = id => document.getElementById(id);
 
+function persistAndRender() {
+  saveState(state);
+  renderAll();
+}
 
-/* =========================================================
-   CONFIGURATION
-   ========================================================= */
+function renderAll() {
+  renderDashboard(state);
+  renderTransactions(state);
+  renderBudgets(state);
+  renderCharts(state);
+  populateSelects();
+  renderBalanceFields();
+  renderBudgetFields();
+  $("currentDate").textContent = new Date().toLocaleDateString(state.settings.locale, {
+    weekday: "short", year: "numeric", month: "short", day: "numeric"
+  });
+}
 
-const TRANSACTION_STORAGE_KEY =
-    "obsidian_finance_transactions";
+function populateSelect(select, items, placeholder, allowAdd = true) {
+  const current = select.value;
+  select.innerHTML = "";
+  if (placeholder) select.add(new Option(placeholder, ""));
+  items.forEach(item => select.add(new Option(item.name, item.id)));
+  if (allowAdd) select.add(new Option("+ Add new...", "__ADD_NEW__"));
+  if ([...select.options].some(o => o.value === current)) select.value = current;
+}
 
-const BALANCE_STORAGE_KEY =
-    "obsidian_finance_opening_balances";
+function populateSelects() {
+  const accounts = state.accounts;
+  populateSelect($("transactionAccount"), accounts, "Select account");
+  populateSelect($("transferFromAccount"), accounts, "Select source");
+  populateSelect($("transferToAccount"), accounts, "Select destination");
+  populateSelect($("transactionCategory"), state.categories, "Select category");
+}
 
-const ACCOUNTS = [
-    "Sterling",
-    "Keystone",
-    "OPay"
-];
+function openModal(id) { $(id).classList.remove("hidden"); }
+function closeModal(id) { $(id).classList.add("hidden"); }
 
+function resetTransactionForm() {
+  editingTransactionId = null;
+  $("transactionModalTitle").textContent = "Add Transaction";
+  $("transactionForm").reset();
+  $("transactionDate").value = new Date().toISOString().slice(0, 10);
+  $("transactionType").value = "expense";
+  updateTransactionMode();
+}
 
-/* =========================================================
-   STATE
-   ========================================================= */
+function updateTransactionMode() {
+  const transfer = $("transactionType").value === "transfer";
+  $("normalAccountGroup").classList.toggle("hidden", transfer);
+  $("transferGroups").classList.toggle("hidden", !transfer);
+  $("categoryGroup").classList.toggle("hidden", transfer);
+  $("transactionAccount").required = !transfer;
+  $("transferFromAccount").required = transfer;
+  $("transferToAccount").required = transfer;
+  $("transactionCategory").required = !transfer;
+}
 
-let transactions =
-    JSON.parse(
-        localStorage.getItem(
-            TRANSACTION_STORAGE_KEY
-        )
-    ) || [];
+function openTransaction(id = null) {
+  resetTransactionForm();
+  if (id) {
+    const t = state.transactions.find(x => x.id === id);
+    if (!t) return;
+    editingTransactionId = id;
+    $("transactionModalTitle").textContent = "Edit Transaction";
+    $("transactionDate").value = t.date;
+    $("transactionType").value = t.type;
+    $("transactionAccount").value = t.accountId || "";
+    $("transferFromAccount").value = t.fromAccountId || "";
+    $("transferToAccount").value = t.toAccountId || "";
+    $("transactionCategory").value = t.categoryId || "";
+    $("transactionDescription").value = t.description || "";
+    $("transactionAmount").value = t.amount;
+    updateTransactionMode();
+  }
+  openModal("transactionModal");
+}
 
-let openingBalances =
-    JSON.parse(
-        localStorage.getItem(
-            BALANCE_STORAGE_KEY
-        )
-    ) || {
-        Sterling: 0,
-        Keystone: 0,
-        OPay: 0
+function handleAddNewSelect(select, type) {
+  if (select.value !== "__ADD_NEW__") return false;
+  itemMode = type;
+  $("itemModalTitle").textContent = type === "account" ? "Add Account" : "Add Category";
+  $("itemName").value = "";
+  $("itemName").placeholder = type === "account" ? "Account name" : "Category name";
+  openModal("itemModal");
+  return true;
+}
+
+$("addTransactionBtn").addEventListener("click", () => openTransaction());
+$("transactionType").addEventListener("change", updateTransactionMode);
+$("transactionSearch").addEventListener("input", () => renderTransactions(state));
+$("transactionFilter").addEventListener("change", () => renderTransactions(state));
+
+["transactionAccount", "transferFromAccount", "transferToAccount"].forEach(id => {
+  $(id).addEventListener("change", () => handleAddNewSelect($(id), "account"));
+});
+$("transactionCategory").addEventListener("change", () => handleAddNewSelect($("transactionCategory"), "category"));
+
+$("transactionForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const type = $("transactionType").value;
+  const amount = Number($("transactionAmount").value);
+  if (!validAmount(amount)) return alert("Enter a valid amount.");
+
+  let transaction;
+  if (type === "transfer") {
+    const from = $("transferFromAccount").value;
+    const to = $("transferToAccount").value;
+    if (!from || !to || from === to) return alert("Choose two different accounts for a transfer.");
+    transaction = {
+      id: editingTransactionId || crypto.randomUUID(),
+      date: $("transactionDate").value,
+      type,
+      fromAccountId: from,
+      toAccountId: to,
+      categoryId: null,
+      accountId: null,
+      description: $("transactionDescription").value.trim(),
+      amount
     };
-
-
-/* =========================================================
-   STORAGE
-   ========================================================= */
-
-function saveTransactions() {
-
-    localStorage.setItem(
-        TRANSACTION_STORAGE_KEY,
-        JSON.stringify(transactions)
-    );
-
-}
-
-
-function saveOpeningBalances() {
-
-    localStorage.setItem(
-        BALANCE_STORAGE_KEY,
-        JSON.stringify(openingBalances)
-    );
-
-}
-
-
-/* =========================================================
-   CURRENCY
-   ========================================================= */
-
-function formatMoney(amount) {
-
-    return new Intl.NumberFormat(
-        "en-NG",
-        {
-            style: "currency",
-            currency: "NGN",
-            minimumFractionDigits: 2
-        }
-    ).format(amount);
-
-}
-
-
-/* =========================================================
-   DATE
-   ========================================================= */
-
-function getTodayString() {
-
-    const now = new Date();
-
-    const year =
-        now.getFullYear();
-
-    const month =
-        String(
-            now.getMonth() + 1
-        ).padStart(2, "0");
-
-    const day =
-        String(
-            now.getDate()
-        ).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-
-}
-
-
-function displayCurrentDate() {
-
-    const element =
-        document.getElementById(
-            "currentDate"
-        );
-
-    if (!element) return;
-
-    const now = new Date();
-
-    element.textContent =
-        now.toLocaleDateString(
-            "en-GB",
-            {
-                day: "2-digit",
-                month: "short",
-                year: "numeric"
-            }
-        ).toUpperCase();
-
-}
-
-
-/* =========================================================
-   ACCOUNT BALANCES
-   ========================================================= */
-
-function calculateBalances() {
-
-    const balances = {
-
-        Sterling:
-            Number(
-                openingBalances.Sterling
-            ) || 0,
-
-        Keystone:
-            Number(
-                openingBalances.Keystone
-            ) || 0,
-
-        OPay:
-            Number(
-                openingBalances.OPay
-            ) || 0
-
+  } else {
+    const accountId = $("transactionAccount").value;
+    const categoryId = $("transactionCategory").value;
+    if (!accountId || !categoryId) return alert("Select an account and category.");
+    transaction = {
+      id: editingTransactionId || crypto.randomUUID(),
+      date: $("transactionDate").value,
+      type,
+      accountId,
+      categoryId,
+      fromAccountId: null,
+      toAccountId: null,
+      description: $("transactionDescription").value.trim(),
+      amount
     };
+  }
 
+  if (editingTransactionId) {
+    const index = state.transactions.findIndex(t => t.id === editingTransactionId);
+    state.transactions[index] = transaction;
+  } else {
+    state.transactions.push(transaction);
+  }
 
-    transactions.forEach(
-        transaction => {
+  persistAndRender();
+  closeModal("transactionModal");
+});
 
-            const amount =
-                Number(
-                    transaction.amount
-                ) || 0;
+$("addAccountBtn").addEventListener("click", () => {
+  $("accountForm").reset();
+  openModal("accountModal");
+});
 
+$("accountForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const check = uniqueName($("accountName").value, state.accounts.map(a => a.name));
+  if (!check.ok) return alert(check.message);
+  const balance = Number($("accountOpeningBalance").value);
+  if (!Number.isFinite(balance) || balance < 0) return alert("Enter a valid opening balance.");
 
-            /*
-             * INCOME
-             *
-             * Money enters the account.
-             */
+  state.accounts.push({ id: crypto.randomUUID(), name: check.name, openingBalance: balance });
+  persistAndRender();
+  closeModal("accountModal");
+});
 
-            if (
-                transaction.type ===
-                "Income"
-            ) {
+$("balanceForm").addEventListener("submit", e => {
+  e.preventDefault();
+  state.accounts.forEach(account => {
+    const input = document.querySelector(`[data-balance-id="${account.id}"]`);
+    if (input) account.openingBalance = Math.max(0, Number(input.value) || 0);
+  });
+  persistAndRender();
+  closeModal("balanceModal");
+});
 
-                balances[
-                    transaction.account
-                ] += amount;
-
-            }
-
-
-            /*
-             * EXPENSE
-             *
-             * Money leaves the account.
-             */
-
-            if (
-                transaction.type ===
-                "Expense"
-            ) {
-
-                balances[
-                    transaction.account
-                ] -= amount;
-
-            }
-
-
-            /*
-             * TRANSFER
-             *
-             * Money leaves one account
-             * and enters another.
-             *
-             * Total cash does NOT change.
-             */
-
-            if (
-                transaction.type ===
-                "Transfer"
-            ) {
-
-                balances[
-                    transaction.fromAccount
-                ] -= amount;
-
-                balances[
-                    transaction.toAccount
-                ] += amount;
-
-            }
-
-        }
-    );
-
-
-    return balances;
-
+function renderBalanceFields() {
+  $("balanceFields").innerHTML = state.accounts.length
+    ? state.accounts.map(a => `
+      <div class="balance-field">
+        <label>${escapeHTML(a.name)}</label>
+        <input class="input" data-balance-id="${a.id}" type="number" min="0" step="0.01" value="${Number(a.openingBalance) || 0}">
+      </div>
+    `).join("")
+    : `<p class="empty">No accounts available.</p>`;
 }
 
+$("editBudgetsBtn").addEventListener("click", () => {
+  renderBudgetFields();
+  openModal("budgetModal");
+});
 
-/* =========================================================
-   TOTAL CASH
-   ========================================================= */
-
-function calculateTotalCash(
-    balances
-) {
-
-    return (
-        balances.Sterling +
-        balances.Keystone +
-        balances.OPay
-    );
-
+function renderBudgetFields() {
+  $("budgetFormFields").innerHTML = state.categories.map(c => `
+    <div class="balance-field">
+      <label>${escapeHTML(c.name)}</label>
+      <input class="input" data-budget-id="${c.id}" type="number" min="0" step="0.01" value="${Number(state.budgets[c.id] || 0)}" placeholder="0 = no budget">
+    </div>
+  `).join("");
 }
 
+$("budgetForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const budgets = {};
+  document.querySelectorAll("[data-budget-id]").forEach(input => {
+    const value = Number(input.value);
+    if (value > 0) budgets[input.dataset.budgetId] = value;
+  });
+  state.budgets = budgets;
+  persistAndRender();
+  closeModal("budgetModal");
+});
 
-/* =========================================================
-   MONTHLY SUMMARY
-   ========================================================= */
+$("itemForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const collection = itemMode === "account" ? state.accounts : state.categories;
+  const check = uniqueName($("itemName").value, collection.map(x => x.name));
+  if (!check.ok) return alert(check.message);
 
-function calculateMonthlySummary() {
+  if (itemMode === "account") {
+    state.accounts.push({ id: crypto.randomUUID(), name: check.name, openingBalance: 0 });
+  } else {
+    state.categories.push({ id: crypto.randomUUID(), name: check.name });
+  }
 
-    const now =
-        new Date();
+  persistAndRender();
+  closeModal("itemModal");
+});
 
-    const currentMonth =
-        now.getMonth();
+document.addEventListener("click", e => {
+  const close = e.target.closest("[data-close-modal]");
+  if (close) closeModal(close.dataset.closeModal);
 
-    const currentYear =
-        now.getFullYear();
+  const edit = e.target.closest(".edit-transaction");
+  if (edit) openTransaction(edit.dataset.id);
 
+  const del = e.target.closest(".delete-transaction");
+  if (del) {
+    if (!confirm("Delete this transaction?")) return;
+    state.transactions = state.transactions.filter(t => t.id !== del.dataset.id);
+    persistAndRender();
+  }
 
-    let income = 0;
+  const balance = e.target.closest(".edit-balance");
+  if (balance) {
+    renderBalanceFields();
+    openModal("balanceModal");
+  }
+});
 
-    let expenses = 0;
+$("exportDataBtn").addEventListener("click", () => exportState(state));
+$("importDataBtn").addEventListener("click", () => $("importFileInput").click());
 
-
-    transactions.forEach(
-        transaction => {
-
-            const date =
-                new Date(
-                    transaction.date
-                );
-
-
-            if (
-                date.getMonth() !==
-                    currentMonth ||
-                date.getFullYear() !==
-                    currentYear
-            ) {
-
-                return;
-
-            }
-
-
-            const amount =
-                Number(
-                    transaction.amount
-                ) || 0;
-
-
-            if (
-                transaction.type ===
-                "Income"
-            ) {
-
-                income += amount;
-
-            }
-
-
-            if (
-                transaction.type ===
-                "Expense"
-            ) {
-
-                expenses += amount;
-
-            }
-
-        }
-    );
-
-
-    return {
-
-        income,
-
-        expenses,
-
-        net:
-            income - expenses
-
-    };
-
-}
-
-
-/* =========================================================
-   UPDATE DASHBOARD
-   ========================================================= */
-
-function updateDashboard() {
-
-    const balances =
-        calculateBalances();
-
-    const totalCash =
-        calculateTotalCash(
-            balances
-        );
-
-    const monthly =
-        calculateMonthlySummary();
-
-
-    /* -----------------------------------------
-       ACCOUNT BALANCES
-       ----------------------------------------- */
-
-    const sterling =
-        document.getElementById(
-            "sterlingBalance"
-        );
-
-    const keystone =
-        document.getElementById(
-            "keystoneBalance"
-        );
-
-    const opay =
-        document.getElementById(
-            "opayBalance"
-        );
-
-
-    if (sterling) {
-
-        sterling.textContent =
-            formatMoney(
-                balances.Sterling
-            );
-
+$("importFileInput").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const imported = JSON.parse(await file.text());
+    if (!imported || imported.version !== 1 || !Array.isArray(imported.accounts) || !Array.isArray(imported.transactions)) {
+      throw new Error("Invalid Obsidian Finance backup.");
     }
-
-
-    if (keystone) {
-
-        keystone.textContent =
-            formatMoney(
-                balances.Keystone
-            );
-
-    }
-
-
-    if (opay) {
-
-        opay.textContent =
-            formatMoney(
-                balances.OPay
-            );
-
-    }
-
-
-    /* -----------------------------------------
-       TOTAL CASH
-       ----------------------------------------- */
-
-    const total =
-        document.getElementById(
-            "totalCash"
-        );
-
-
-    if (total) {
-
-        total.textContent =
-            formatMoney(
-                totalCash
-            );
-
-    }
-
-
-    /* -----------------------------------------
-       MONTHLY SUMMARY
-       ----------------------------------------- */
-
-    const income =
-        document.getElementById(
-            "monthlyIncome"
-        );
-
-    const expenses =
-        document.getElementById(
-            "monthlyExpenses"
-        );
-
-    const net =
-        document.getElementById(
-            "monthlyNet"
-        );
-
-
-    if (income) {
-
-        income.textContent =
-            formatMoney(
-                monthly.income
-            );
-
-    }
-
-
-    if (expenses) {
-
-        expenses.textContent =
-            formatMoney(
-                monthly.expenses
-            );
-
-    }
-
-
-    if (net) {
-
-        net.textContent =
-            formatMoney(
-                monthly.net
-            );
-
-    }
-
-
-    /* -----------------------------------------
-       TRANSACTIONS
-       ----------------------------------------- */
-
-    renderTransactions();
-
-}
-
-
-/* =========================================================
-   TRANSACTION DISPLAY
-   ========================================================= */
-
-function renderTransactions() {
-
-    const table =
-        document.getElementById(
-            "transactionTable"
-        );
-
-
-    if (!table) return;
-
-
-    table.innerHTML = "";
-
-
-    if (
-        transactions.length === 0
-    ) {
-
-        table.innerHTML = `
-            <tr>
-                <td
-                    colspan="7"
-                    class="empty-state"
-                >
-                    No transactions yet.
-                </td>
-            </tr>
-        `;
-
-        return;
-
-    }
-
-
-    const sortedTransactions =
-        [...transactions].sort(
-            (a, b) =>
-                new Date(b.date) -
-                new Date(a.date)
-        );
-
-
-    sortedTransactions.forEach(
-        transaction => {
-
-            const row =
-                document.createElement(
-                    "tr"
-                );
-
-
-            let amountDisplay = "";
-
-            let accountDisplay =
-                transaction.account;
-
-
-            /* -----------------------------------------
-               INCOME
-               ----------------------------------------- */
-
-            if (
-                transaction.type ===
-                "Income"
-            ) {
-
-                amountDisplay =
-                    `+${formatMoney(
-                        transaction.amount
-                    )}`;
-
-            }
-
-
-            /* -----------------------------------------
-               EXPENSE
-               ----------------------------------------- */
-
-            if (
-                transaction.type ===
-                "Expense"
-            ) {
-
-                amountDisplay =
-                    `-${formatMoney(
-                        transaction.amount
-                    )}`;
-
-            }
-
-
-            /* -----------------------------------------
-               TRANSFER
-               ----------------------------------------- */
-
-            if (
-                transaction.type ===
-                "Transfer"
-            ) {
-
-                accountDisplay =
-                    `${transaction.fromAccount}
-                     → 
-                     ${transaction.toAccount}`;
-
-                amountDisplay =
-                    formatMoney(
-                        transaction.amount
-                    );
-
-            }
-
-
-            row.innerHTML = `
-
-                <td>
-                    ${escapeHTML(
-                        transaction.date
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHTML(
-                        accountDisplay
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHTML(
-                        transaction.description
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHTML(
-                        transaction.category
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHTML(
-                        transaction.type
-                    )}
-                </td>
-
-                <td>
-                    ${amountDisplay}
-                </td>
-
-                <td>
-
-                    <button
-                        class="edit-btn"
-                        onclick="
-                            editTransaction(
-                                ${transaction.id}
-                            )
-                        "
-                    >
-                        EDIT
-                    </button>
-
-                    <button
-                        class="delete-btn"
-                        onclick="
-                            deleteTransaction(
-                                ${transaction.id}
-                            )
-                        "
-                    >
-                        DELETE
-                    </button>
-
-                </td>
-
-            `;
-
-
-            table.appendChild(row);
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   HTML SAFETY
-   ========================================================= */
+    state = imported;
+    saveState(state);
+    renderAll();
+    alert("Backup imported successfully.");
+  } catch (error) {
+    alert(`Import failed: ${error.message}`);
+  } finally {
+    e.target.value = "";
+  }
+});
+
+document.querySelectorAll(".modal").forEach(modal => {
+  modal.addEventListener("click", e => {
+    if (e.target === modal) closeModal(modal.id);
+  });
+});
 
 function escapeHTML(value) {
-
-    return String(value)
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-
+  return String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[c]));
 }
 
-
-/* =========================================================
-   DELETE TRANSACTION
-   ========================================================= */
-
-function deleteTransaction(id) {
-
-    const transaction =
-        transactions.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!transaction) {
-
-        return;
-
-    }
-
-
-    const confirmed =
-        confirm(
-            `Delete "${transaction.description}"?`
-        );
-
-
-    if (!confirmed) {
-
-        return;
-
-    }
-
-
-    transactions =
-        transactions.filter(
-            item =>
-                item.id !== id
-        );
-
-
-    saveTransactions();
-
-    updateDashboard();
-
-}
-
-
-/* =========================================================
-   EDIT TRANSACTION
-   ========================================================= */
-
-function editTransaction(id) {
-
-    const transaction =
-        transactions.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!transaction) {
-
-        return;
-
-    }
-
-
-    transactionModal.classList.add(
-        "active"
-    );
-
-
-    transactionForm.dataset.editingId =
-        transaction.id;
-
-
-    document.getElementById(
-        "transactionDate"
-    ).value =
-        transaction.date;
-
-
-    document.getElementById(
-        "transactionType"
-    ).value =
-        transaction.type;
-
-
-    document.getElementById(
-        "transactionDescription"
-    ).value =
-        transaction.description;
-
-
-    document.getElementById(
-        "transactionAmount"
-    ).value =
-        transaction.amount;
-
-
-    /*
-     * Category
-     */
-
-    document.getElementById(
-        "transactionCategory"
-    ).value =
-        transaction.category;
-
-
-    /*
-     * Normal account transaction
-     */
-
-    const accountElement =
-        document.getElementById(
-            "transactionAccount"
-        );
-
-
-    if (accountElement) {
-
-        accountElement.value =
-            transaction.account || "";
-
-    }
-
-
-    /*
-     * Transfer fields
-     */
-
-    const fromElement =
-        document.getElementById(
-            "transferFromAccount"
-        );
-
-    const toElement =
-        document.getElementById(
-            "transferToAccount"
-        );
-
-
-    if (fromElement) {
-
-        fromElement.value =
-            transaction.fromAccount || "";
-
-    }
-
-
-    if (toElement) {
-
-        toElement.value =
-            transaction.toAccount || "";
-
-    }
-
-
-    updateTransactionFormMode();
-
-}
-
-
-/* =========================================================
-   TRANSACTION MODAL
-   ========================================================= */
-
-const transactionModal =
-    document.getElementById(
-        "transactionModal"
-    );
-
-const addTransactionBtn =
-    document.getElementById(
-        "addTransactionBtn"
-    );
-
-const closeModalBtn =
-    document.getElementById(
-        "closeModalBtn"
-    );
-
-const cancelTransactionBtn =
-    document.getElementById(
-        "cancelTransactionBtn"
-    );
-
-const transactionForm =
-    document.getElementById(
-        "transactionForm"
-    );
-
-const transactionDate =
-    document.getElementById(
-        "transactionDate"
-    );
-
-const transactionType =
-    document.getElementById(
-        "transactionType"
-    );
-
-
-/* =========================================================
-   OPEN TRANSACTION MODAL
-   ========================================================= */
-
-if (addTransactionBtn) {
-
-    addTransactionBtn.addEventListener(
-        "click",
-        () => {
-
-            transactionForm.reset();
-
-            delete transactionForm.dataset
-                .editingId;
-
-            setDefaultDate();
-
-            updateTransactionFormMode();
-
-            transactionModal.classList.add(
-                "active"
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   CLOSE TRANSACTION MODAL
-   ========================================================= */
-
-function closeTransactionModal() {
-
-    if (!transactionModal) {
-
-        return;
-
-    }
-
-
-    transactionModal.classList.remove(
-        "active"
-    );
-
-
-    transactionForm.reset();
-
-
-    delete transactionForm.dataset
-        .editingId;
-
-
-    setDefaultDate();
-
-    updateTransactionFormMode();
-
-}
-
-
-if (closeModalBtn) {
-
-    closeModalBtn.addEventListener(
-        "click",
-        closeTransactionModal
-    );
-
-}
-
-
-if (cancelTransactionBtn) {
-
-    cancelTransactionBtn.addEventListener(
-        "click",
-        closeTransactionModal
-    );
-
-}
-
-
-if (transactionModal) {
-
-    transactionModal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                transactionModal
-            ) {
-
-                closeTransactionModal();
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   DEFAULT DATE
-   ========================================================= */
-
-function setDefaultDate() {
-
-    if (!transactionDate) {
-
-        return;
-
-    }
-
-
-    transactionDate.value =
-        getTodayString();
-
-}
-
-
-/* =========================================================
-   TRANSACTION TYPE UI
-   ========================================================= */
-
-function updateTransactionFormMode() {
-
-    const type =
-        transactionType?.value;
-
-
-    const normalAccountGroup =
-        document.getElementById(
-            "normalAccountGroup"
-        );
-
-    const transferFromGroup =
-        document.getElementById(
-            "transferFromGroup"
-        );
-
-    const transferToGroup =
-        document.getElementById(
-            "transferToGroup"
-        );
-
-
-    /*
-     * Transfer
-     */
-
-    if (
-        type ===
-        "Transfer"
-    ) {
-
-        if (normalAccountGroup) {
-
-            normalAccountGroup.style.display =
-                "none";
-
-        }
-
-
-        if (transferFromGroup) {
-
-            transferFromGroup.style.display =
-                "block";
-
-        }
-
-
-        if (transferToGroup) {
-
-            transferToGroup.style.display =
-                "block";
-
-        }
-
-    }
-
-    /*
-     * Income / Expense
-     */
-
-    else {
-
-        if (normalAccountGroup) {
-
-            normalAccountGroup.style.display =
-                "block";
-
-        }
-
-
-        if (transferFromGroup) {
-
-            transferFromGroup.style.display =
-                "none";
-
-        }
-
-
-        if (transferToGroup) {
-
-            transferToGroup.style.display =
-                "none";
-
-        }
-
-    }
-
-}
-
-
-if (transactionType) {
-
-    transactionType.addEventListener(
-        "change",
-        updateTransactionFormMode
-    );
-
-}
-
-
-/* =========================================================
-   SAVE TRANSACTION
-   ========================================================= */
-
-if (transactionForm) {
-
-    transactionForm.addEventListener(
-        "submit",
-        event => {
-
-            event.preventDefault();
-
-
-            const type =
-                document.getElementById(
-                    "transactionType"
-                ).value;
-
-
-            const amount =
-                Number(
-                    document.getElementById(
-                        "transactionAmount"
-                    ).value
-                );
-
-
-            const date =
-                document.getElementById(
-                    "transactionDate"
-                ).value;
-
-
-            const description =
-                document.getElementById(
-                    "transactionDescription"
-                ).value.trim();
-
-
-            const category =
-                document.getElementById(
-                    "transactionCategory"
-                ).value;
-
-
-            /*
-             * Basic validation
-             */
-
-            if (
-                !date ||
-                !type ||
-                !description ||
-                !amount ||
-                amount <= 0
-            ) {
-
-                alert(
-                    "Please complete all required fields."
-                );
-
-                return;
-
-            }
-
-
-            /*
-             * EDITING
-             */
-
-            const editingId =
-                transactionForm.dataset
-                    .editingId;
-
-
-            /*
-             * -----------------------------------------
-             * TRANSFER
-             * -----------------------------------------
-             */
-
-            if (
-                type ===
-                "Transfer"
-            ) {
-
-                const fromAccount =
-                    document.getElementById(
-                        "transferFromAccount"
-                    )?.value;
-
-
-                const toAccount =
-                    document.getElementById(
-                        "transferToAccount"
-                    )?.value;
-
-
-                if (
-                    !fromAccount ||
-                    !toAccount
-                ) {
-
-                    alert(
-                        "Select both accounts."
-                    );
-
-                    return;
-
-                }
-
-
-                if (
-                    fromAccount ===
-                    toAccount
-                ) {
-
-                    alert(
-                        "Source and destination accounts must be different."
-                    );
-
-                    return;
-
-                }
-
-
-                const transferTransaction = {
-
-                    id:
-                        editingId
-                            ? Number(
-                                editingId
-                            )
-                            : Date.now(),
-
-                    date,
-
-                    type:
-                        "Transfer",
-
-                    category:
-                        "Transfer",
-
-                    description,
-
-                    amount,
-
-                    fromAccount,
-
-                    toAccount
-
-                };
-
-
-                saveOrUpdateTransaction(
-                    transferTransaction,
-                    editingId
-                );
-
-
-                return;
-
-            }
-
-
-            /*
-             * -----------------------------------------
-             * INCOME / EXPENSE
-             * -----------------------------------------
-             */
-
-            const account =
-                document.getElementById(
-                    "transactionAccount"
-                ).value;
-
-
-            if (!account) {
-
-                alert(
-                    "Select an account."
-                );
-
-                return;
-
-            }
-
-
-            const normalTransaction = {
-
-                id:
-                    editingId
-                        ? Number(
-                            editingId
-                        )
-                        : Date.now(),
-
-                date,
-
-                account,
-
-                type,
-
-                category,
-
-                description,
-
-                amount
-
-            };
-
-
-            saveOrUpdateTransaction(
-                normalTransaction,
-                editingId
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   SAVE OR UPDATE TRANSACTION
-   ========================================================= */
-
-function saveOrUpdateTransaction(
-    transaction,
-    editingId
-) {
-
-    if (editingId) {
-
-        const index =
-            transactions.findIndex(
-                item =>
-                    item.id ===
-                    Number(editingId)
-            );
-
-
-        if (index !== -1) {
-
-            transactions[index] =
-                transaction;
-
-        }
-
-    }
-
-    else {
-
-        transactions.push(
-            transaction
-        );
-
-    }
-
-
-    saveTransactions();
-
-    updateDashboard();
-
-    closeTransactionModal();
-
-}
-
-
-/* =========================================================
-   OPENING BALANCE MODAL
-   ========================================================= */
-
-const balanceModal =
-    document.getElementById(
-        "balanceModal"
-    );
-
-const editBalancesBtn =
-    document.getElementById(
-        "editBalancesBtn"
-    );
-
-const closeBalanceModalBtn =
-    document.getElementById(
-        "closeBalanceModalBtn"
-    );
-
-const cancelBalanceBtn =
-    document.getElementById(
-        "cancelBalanceBtn"
-    );
-
-const balanceForm =
-    document.getElementById(
-        "balanceForm"
-    );
-
-
-/* =========================================================
-   OPEN BALANCES
-   ========================================================= */
-
-if (editBalancesBtn) {
-
-    editBalancesBtn.addEventListener(
-        "click",
-        () => {
-
-            document.getElementById(
-                "sterlingOpening"
-            ).value =
-                openingBalances.Sterling;
-
-
-            document.getElementById(
-                "keystoneOpening"
-            ).value =
-                openingBalances.Keystone;
-
-
-            document.getElementById(
-                "opayOpening"
-            ).value =
-                openingBalances.OPay;
-
-
-            balanceModal.classList.add(
-                "active"
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   CLOSE BALANCES
-   ========================================================= */
-
-function closeBalanceModal() {
-
-    if (!balanceModal) {
-
-        return;
-
-    }
-
-
-    balanceModal.classList.remove(
-        "active"
-    );
-
-}
-
-
-if (closeBalanceModalBtn) {
-
-    closeBalanceModalBtn.addEventListener(
-        "click",
-        closeBalanceModal
-    );
-
-}
-
-
-if (cancelBalanceBtn) {
-
-    cancelBalanceBtn.addEventListener(
-        "click",
-        closeBalanceModal
-    );
-
-}
-
-
-if (balanceModal) {
-
-    balanceModal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                balanceModal
-            ) {
-
-                closeBalanceModal();
-
-            }
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   SAVE OPENING BALANCES
-   ========================================================= */
-
-if (balanceForm) {
-
-    balanceForm.addEventListener(
-        "submit",
-        event => {
-
-            event.preventDefault();
-
-
-            openingBalances = {
-
-                Sterling:
-                    Number(
-                        document.getElementById(
-                            "sterlingOpening"
-                        ).value
-                    ) || 0,
-
-                Keystone:
-                    Number(
-                        document.getElementById(
-                            "keystoneOpening"
-                        ).value
-                    ) || 0,
-
-                OPay:
-                    Number(
-                        document.getElementById(
-                            "opayOpening"
-                        ).value
-                    ) || 0
-
-            };
-
-
-            saveOpeningBalances();
-
-            updateDashboard();
-
-            closeBalanceModal();
-
-        }
-    );
-
-}
-
-
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
-
-function initializeApp() {
-
-    displayCurrentDate();
-
-    setDefaultDate();
-
-    updateTransactionFormMode();
-
-    updateDashboard();
-
-}
-
-
-/* =========================================================
-   START
-   ========================================================= */
-
-initializeApp();
+renderAll();

@@ -1,893 +1,297 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        Obsidian Finance
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="css/style.css"
-    >
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Obsidian Finance — a local-first personal finance manager.">
+  <meta name="theme-color" content="#080808">
+  <title>Obsidian Finance</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
 </head>
-
-
 <body>
-
-
-<!-- =====================================================
-     TOP BAR
-     ===================================================== -->
-
-<header class="topbar">
-
+  <header class="topbar">
     <div>
-
-        <h1>
-            OBSIDIAN FINANCE
-        </h1>
-
-        <p>
-            Personal Financial Command Center
-        </p>
-
+      <div class="brand">OBSIDIAN FINANCE</div>
+      <div class="subtitle">Local-First Personal Financial Command Center</div>
     </div>
-
-
-    <div
-        class="date"
-        id="currentDate"
-    >
-        26 SEP 2026
+    <div class="topbar-actions">
+      <span id="currentDate"></span>
+      <button id="exportDataBtn" class="btn btn-ghost">Export</button>
+      <button id="importDataBtn" class="btn btn-ghost">Import</button>
+      <input id="importFileInput" type="file" accept=".json,application/json" hidden>
     </div>
+  </header>
 
-</header>
-
-
-
-<!-- =====================================================
-     MAIN
-     ===================================================== -->
-
-<main>
-
-
-    <!-- =================================================
-         TOTAL CASH
-         ================================================= -->
-
-    <section class="hero-card">
-
-        <span class="label">
-            TOTAL CASH
-        </span>
-
-        <h2 id="totalCash">
-            ₦0.00
-        </h2>
-
-        <span class="muted">
-            Across all accounts
-        </span>
-
+  <main class="container">
+    <section class="hero card">
+      <div>
+        <span class="eyebrow">TOTAL CASH</span>
+        <h1 id="totalCash">₦0.00</h1>
+        <p id="runwayLine">Add expenses to calculate runway.</p>
+      </div>
+      <button id="addTransactionBtn" class="btn btn-primary">+ Transaction</button>
     </section>
-
-
-
-    <!-- =================================================
-         ACCOUNTS
-         ================================================= -->
 
     <section>
-
-
-        <div class="section-header">
-
-            <h3>
-                ACCOUNTS
-            </h3>
-
-
-            <button
-                id="editBalancesBtn"
-            >
-                EDIT BALANCES
-            </button>
-
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">ACCOUNTS</span>
+          <h2>Your accounts</h2>
         </div>
-
-
-
-        <div class="account-grid">
-
-
-            <!-- STERLING -->
-
-            <div class="account-card">
-
-                <span class="account-name">
-                    STERLING
-                </span>
-
-                <strong id="sterlingBalance">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-
-            <!-- KEYSTONE -->
-
-            <div class="account-card">
-
-                <span class="account-name">
-                    KEYSTONE
-                </span>
-
-                <strong id="keystoneBalance">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-
-            <!-- OPAY -->
-
-            <div class="account-card">
-
-                <span class="account-name">
-                    OPAY
-                </span>
-
-                <strong id="opayBalance">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-        </div>
-
+        <button id="addAccountBtn" class="btn btn-secondary">+ Account</button>
+      </div>
+      <div id="accountsGrid" class="accounts-grid"></div>
     </section>
 
-
-
-    <!-- =================================================
-         MONTHLY SUMMARY
-         ================================================= -->
-
-    <section>
-
-
-        <div class="section-header">
-
-            <h3>
-                THIS MONTH
-            </h3>
-
-        </div>
-
-
-
-        <div class="summary-grid">
-
-
-            <!-- INCOME -->
-
-            <div class="summary-card">
-
-                <span>
-                    INCOME
-                </span>
-
-                <strong id="monthlyIncome">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-
-            <!-- EXPENSES -->
-
-            <div class="summary-card">
-
-                <span>
-                    EXPENSES
-                </span>
-
-                <strong id="monthlyExpenses">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-
-            <!-- NET -->
-
-            <div class="summary-card">
-
-                <span>
-                    NET CASH FLOW
-                </span>
-
-                <strong id="monthlyNet">
-                    ₦0.00
-                </strong>
-
-            </div>
-
-
-        </div>
-
+    <section class="summary-grid">
+      <article class="metric card">
+        <span>Income</span>
+        <strong id="monthlyIncome">₦0.00</strong>
+        <small>This month</small>
+      </article>
+      <article class="metric card">
+        <span>Expenses</span>
+        <strong id="monthlyExpenses">₦0.00</strong>
+        <small>This month</small>
+      </article>
+      <article class="metric card">
+        <span>Net Cash Flow</span>
+        <strong id="monthlyNet">₦0.00</strong>
+        <small>This month</small>
+      </article>
+      <article class="metric card">
+        <span>Transactions</span>
+        <strong id="transactionCount">0</strong>
+        <small>All time</small>
+      </article>
     </section>
 
-
-
-    <!-- =================================================
-         TRANSACTIONS
-         ================================================= -->
-
-    <section>
-
-
-        <div class="section-header">
-
-            <h3>
-                RECENT TRANSACTIONS
-            </h3>
-
-
-            <button
-                id="addTransactionBtn"
-            >
-                + ADD TRANSACTION
-            </button>
-
+    <section class="charts-grid">
+      <article class="card chart-card chart-wide">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">EQUITY</span>
+            <h2>Total cash over time</h2>
+          </div>
         </div>
+        <div class="chart-wrap"><canvas id="equityChart"></canvas></div>
+      </article>
 
-
-
-        <div class="transaction-container">
-
-
-            <table>
-
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            DATE
-                        </th>
-
-                        <th>
-                            ACCOUNT
-                        </th>
-
-                        <th>
-                            DESCRIPTION
-                        </th>
-
-                        <th>
-                            CATEGORY
-                        </th>
-
-                        <th>
-                            TYPE
-                        </th>
-
-                        <th>
-                            AMOUNT
-                        </th>
-
-                        <th>
-                            ACTIONS
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-
-                <tbody
-                    id="transactionTable"
-                >
-
-                    <tr>
-
-                        <td
-                            colspan="7"
-                            class="empty-state"
-                        >
-                            No transactions yet.
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
-
-            </table>
-
-
+      <article class="card chart-card">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">CASH FLOW</span>
+            <h2>Income vs expenses</h2>
+          </div>
         </div>
+        <div class="chart-wrap"><canvas id="cashflowChart"></canvas></div>
+      </article>
 
+      <article class="card chart-card">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">SPENDING</span>
+            <h2>By category</h2>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+        <p id="categoryChartEmpty" class="empty hidden">No expense data yet.</p>
+      </article>
+
+      <article class="card chart-card">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">DISTRIBUTION</span>
+            <h2>Account balances</h2>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="accountsChart"></canvas></div>
+        <p id="accountsChartEmpty" class="empty hidden">Add an account to begin.</p>
+      </article>
     </section>
 
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">BUDGETS</span>
+          <h2>Monthly budgets</h2>
+        </div>
+        <button id="editBudgetsBtn" class="btn btn-secondary">Edit Budgets</button>
+      </div>
+      <div id="budgetList" class="budget-list"></div>
+    </section>
 
-</main>
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">LEDGER</span>
+          <h2>Recent transactions</h2>
+        </div>
+        <div class="toolbar">
+          <input id="transactionSearch" class="input compact-input" type="search" placeholder="Search...">
+          <select id="transactionFilter" class="input compact-input">
+            <option value="all">All types</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Account</th>
+              <th>Category</th>
+              <th class="amount-col">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="transactionTable"></tbody>
+        </table>
+      </div>
+      <p id="transactionEmpty" class="empty">No transactions yet.</p>
+    </section>
+  </main>
 
+  <div id="transactionModal" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">LEDGER</span>
+          <h2 id="transactionModalTitle">Add Transaction</h2>
+        </div>
+        <button class="icon-btn" data-close-modal="transactionModal">×</button>
+      </div>
 
+      <form id="transactionForm">
+        <input id="transactionDate" type="date" class="input" required>
+        <select id="transactionType" class="input" required>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+          <option value="transfer">Transfer</option>
+        </select>
 
-<!-- =====================================================
-     ADD / EDIT TRANSACTION MODAL
-     ===================================================== -->
-
-<div
-    class="modal-overlay"
-    id="transactionModal"
->
-
-
-    <div class="modal">
-
-
-        <!-- MODAL HEADER -->
-
-        <div class="modal-header">
-
-
-            <div>
-
-                <h2>
-                    TRANSACTION
-                </h2>
-
-                <p>
-                    Record money entering,
-                    leaving, or moving between accounts.
-                </p>
-
-            </div>
-
-
-            <button
-                type="button"
-                class="close-button"
-                id="closeModalBtn"
-            >
-                ×
-            </button>
-
-
+        <div id="normalAccountGroup">
+          <label>Account</label>
+          <select id="transactionAccount" class="input" required></select>
         </div>
 
-
-
-        <!-- FORM -->
-
-        <form
-            id="transactionForm"
-        >
-
-
-            <!-- DATE -->
-
-            <div class="form-group">
-
-                <label
-                    for="transactionDate"
-                >
-                    DATE
-                </label>
-
-                <input
-                    type="date"
-                    id="transactionDate"
-                    required
-                >
-
-            </div>
-
-
-
-            <!-- TYPE -->
-
-            <div class="form-group">
-
-                <label
-                    for="transactionType"
-                >
-                    TYPE
-                </label>
-
-                <select
-                    id="transactionType"
-                    required
-                >
-
-                    <option value="">
-                        Select type
-                    </option>
-
-                    <option value="Income">
-                        Income
-                    </option>
-
-                    <option value="Expense">
-                        Expense
-                    </option>
-
-                    <option value="Transfer">
-                        Transfer
-                    </option>
-
-                </select>
-
-            </div>
-
-
-
-            <!-- NORMAL ACCOUNT -->
-
-            <div
-                class="form-group"
-                id="normalAccountGroup"
-            >
-
-                <label
-                    for="transactionAccount"
-                >
-                    ACCOUNT
-                </label>
-
-                <select
-                    id="transactionAccount"
-                >
-
-                    <option value="">
-                        Select account
-                    </option>
-
-                    <option value="Sterling">
-                        Sterling
-                    </option>
-
-                    <option value="Keystone">
-                        Keystone
-                    </option>
-
-                    <option value="OPay">
-                        OPay
-                    </option>
-
-                </select>
-
-            </div>
-
-
-
-            <!-- TRANSFER FROM -->
-
-            <div
-                class="form-group"
-                id="transferFromGroup"
-                style="display: none;"
-            >
-
-                <label
-                    for="transferFromAccount"
-                >
-                    FROM ACCOUNT
-                </label>
-
-                <select
-                    id="transferFromAccount"
-                >
-
-                    <option value="">
-                        Select source account
-                    </option>
-
-                    <option value="Sterling">
-                        Sterling
-                    </option>
-
-                    <option value="Keystone">
-                        Keystone
-                    </option>
-
-                    <option value="OPay">
-                        OPay
-                    </option>
-
-                </select>
-
-            </div>
-
-
-
-            <!-- TRANSFER TO -->
-
-            <div
-                class="form-group"
-                id="transferToGroup"
-                style="display: none;"
-            >
-
-                <label
-                    for="transferToAccount"
-                >
-                    TO ACCOUNT
-                </label>
-
-                <select
-                    id="transferToAccount"
-                >
-
-                    <option value="">
-                        Select destination account
-                    </option>
-
-                    <option value="Sterling">
-                        Sterling
-                    </option>
-
-                    <option value="Keystone">
-                        Keystone
-                    </option>
-
-                    <option value="OPay">
-                        OPay
-                    </option>
-
-                </select>
-
-            </div>
-
-
-
-            <!-- CATEGORY -->
-
-            <div class="form-group">
-
-                <label
-                    for="transactionCategory"
-                >
-                    CATEGORY
-                </label>
-
-                <select
-                    id="transactionCategory"
-                    required
-                >
-
-                    <option value="">
-                        Select category
-                    </option>
-
-                    <option value="Food">
-                        Food
-                    </option>
-
-                    <option value="Transport">
-                        Transport
-                    </option>
-
-                    <option value="Education">
-                        Education
-                    </option>
-
-                    <option value="Business">
-                        Business
-                    </option>
-
-                    <option value="Trading">
-                        Trading
-                    </option>
-
-                    <option value="Bills">
-                        Bills
-                    </option>
-
-                    <option value="Shopping">
-                        Shopping
-                    </option>
-
-                    <option value="Family">
-                        Family
-                    </option>
-
-                    <option value="Savings">
-                        Savings
-                    </option>
-
-                    <option value="Other">
-                        Other
-                    </option>
-
-                </select>
-
-            </div>
-
-
-
-            <!-- DESCRIPTION -->
-
-            <div class="form-group">
-
-                <label
-                    for="transactionDescription"
-                >
-                    DESCRIPTION
-                </label>
-
-                <input
-                    type="text"
-                    id="transactionDescription"
-                    placeholder="e.g. Lunch"
-                    maxlength="100"
-                    required
-                >
-
-            </div>
-
-
-
-            <!-- AMOUNT -->
-
-            <div class="form-group">
-
-                <label
-                    for="transactionAmount"
-                >
-                    AMOUNT (₦)
-                </label>
-
-                <input
-                    type="number"
-                    id="transactionAmount"
-                    placeholder="0.00"
-                    min="0.01"
-                    step="0.01"
-                    required
-                >
-
-            </div>
-
-
-
-            <!-- ACTIONS -->
-
-            <div class="form-actions">
-
-
-                <button
-                    type="button"
-                    class="cancel-button"
-                    id="cancelTransactionBtn"
-                >
-                    CANCEL
-                </button>
-
-
-                <button
-                    type="submit"
-                    class="save-button"
-                >
-                    SAVE TRANSACTION
-                </button>
-
-
-            </div>
-
-
-        </form>
-
-
+        <div id="transferGroups" class="form-grid hidden">
+          <div>
+            <label>From</label>
+            <select id="transferFromAccount" class="input"></select>
+          </div>
+          <div>
+            <label>To</label>
+            <select id="transferToAccount" class="input"></select>
+          </div>
+        </div>
+
+        <div id="categoryGroup">
+          <label>Category</label>
+          <select id="transactionCategory" class="input"></select>
+        </div>
+
+        <input id="transactionDescription" class="input" type="text" placeholder="Description" maxlength="120">
+        <input id="transactionAmount" class="input" type="number" min="0.01" step="0.01" placeholder="Amount" required>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="transactionModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Transaction</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-</div>
-
-
-
-<!-- =====================================================
-     ACCOUNT BALANCE MODAL
-     ===================================================== -->
-
-<div
-    class="modal-overlay"
-    id="balanceModal"
->
-
-
-    <div class="modal">
-
-
-        <!-- HEADER -->
-
-        <div class="modal-header">
-
-
-            <div>
-
-                <h2>
-                    ACCOUNT BALANCES
-                </h2>
-
-                <p>
-                    Set the starting balance
-                    for each account.
-                </p>
-
-            </div>
-
-
-            <button
-                type="button"
-                class="close-button"
-                id="closeBalanceModalBtn"
-            >
-                ×
-            </button>
-
-
+  <div id="accountModal" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">ACCOUNTS</span>
+          <h2 id="accountModalTitle">Add Account</h2>
         </div>
-
-
-
-        <!-- FORM -->
-
-        <form
-            id="balanceForm"
-        >
-
-
-            <!-- STERLING -->
-
-            <div class="form-group">
-
-                <label
-                    for="sterlingOpening"
-                >
-                    STERLING
-                </label>
-
-                <input
-                    type="number"
-                    id="sterlingOpening"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                >
-
-            </div>
-
-
-
-            <!-- KEYSTONE -->
-
-            <div class="form-group">
-
-                <label
-                    for="keystoneOpening"
-                >
-                    KEYSTONE
-                </label>
-
-                <input
-                    type="number"
-                    id="keystoneOpening"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                >
-
-            </div>
-
-
-
-            <!-- OPAY -->
-
-            <div class="form-group">
-
-                <label
-                    for="opayOpening"
-                >
-                    OPAY
-                </label>
-
-                <input
-                    type="number"
-                    id="opayOpening"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                >
-
-            </div>
-
-
-
-            <!-- ACTIONS -->
-
-            <div class="form-actions">
-
-
-                <button
-                    type="button"
-                    class="cancel-button"
-                    id="cancelBalanceBtn"
-                >
-                    CANCEL
-                </button>
-
-
-                <button
-                    type="submit"
-                    class="save-button"
-                >
-                    SAVE BALANCES
-                </button>
-
-
-            </div>
-
-
-        </form>
-
-
+        <button class="icon-btn" data-close-modal="accountModal">×</button>
+      </div>
+      <form id="accountForm">
+        <input id="accountName" class="input" type="text" placeholder="Account name" maxlength="60" required>
+        <input id="accountOpeningBalance" class="input" type="number" step="0.01" min="0" placeholder="Opening balance" required>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="accountModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Account</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-</div>
+  <div id="balanceModal" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">ACCOUNT</span>
+          <h2>Edit Opening Balances</h2>
+        </div>
+        <button class="icon-btn" data-close-modal="balanceModal">×</button>
+      </div>
+      <form id="balanceForm">
+        <div id="balanceFields"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="balanceModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Balances</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <div id="budgetModal" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">BUDGETS</span>
+          <h2>Monthly Budget Limits</h2>
+        </div>
+        <button class="icon-btn" data-close-modal="budgetModal">×</button>
+      </div>
+      <form id="budgetForm">
+        <div id="budgetFormFields"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="budgetModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Budgets</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <div id="itemModal" class="modal hidden">
+    <div class="modal-panel small">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">CUSTOMIZE</span>
+          <h2 id="itemModalTitle">Add Item</h2>
+        </div>
+        <button class="icon-btn" data-close-modal="itemModal">×</button>
+      </div>
+      <form id="itemForm">
+        <input id="itemName" class="input" type="text" maxlength="60" required>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="itemModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-<!-- =====================================================
-     FOOTER
-     ===================================================== -->
+  <footer>
+    <span>OBSIDIAN FINANCE</span>
+    <span>Local-first • User-owned data • No financial credentials</span>
+  </footer>
 
-<footer>
-
-    <p>
-        OBSIDIAN FINANCE
-        •
-        LOCAL FIRST
-        •
-        PRIVATE
-    </p>
-
-</footer>
-
-
-
-<!-- =====================================================
-     JAVASCRIPT
-     ===================================================== -->
-
-<script
-    src="js/app.js"
-></script>
-
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
-
 </html>

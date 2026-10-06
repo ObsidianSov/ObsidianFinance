@@ -1,0 +1,16 @@
+@media (max-width: 900px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .topbar { padding: 14px 16px; align-items: flex-start; flex-direction: column; }
+  .topbar-actions { width: 100%; flex-wrap: wrap; }
+  .container { width: min(100% - 24px, 1280px); margin-top: 18px; }
+  .card { padding: 16px; }
+  .hero, .section-heading { align-items: flex-start; flex-direction: column; }
+  .hero .btn { width: 100%; }
+  .summary-grid, .charts-grid { grid-template-columns: 1fr; }
+  .chart-wide { grid-column: auto; }
+  .toolbar { width: 100%; }
+  .compact-input { flex: 1; min-width: 0; }
+  footer { padding: 18px 16px; flex-direction: column; }
+}
