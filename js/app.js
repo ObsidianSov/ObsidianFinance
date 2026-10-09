@@ -1,18 +1,24 @@
-import { loadState, saveState, exportState } from "./core/storage.js";
-import { uniqueName, validAmount } from "./core/validators.js";
+import { loadState, saveState, exportState, backupBeforeImport } from "./core/storage.js";
+import { uniqueName, validAmount, isValidDate, normalizeState } from "./core/validators.js";
 import { renderDashboard } from "./ui/dashboard.js";
 import { renderTransactions } from "./ui/transactions.js";
 import { renderBudgets } from "./ui/budgets.js";
 import { renderCharts } from "./charts/charts.js";
 
-let state = loadState();
+const loaded = loadState();
+let state = loaded.state;
 let itemMode = null;
 let editingTransactionId = null;
+let pendingSelectId = null;
+let saveWarned = false;
 
 const $ = id => document.getElementById(id);
 
 function persistAndRender() {
-  saveState(state);
+  if (!saveState(state) && !saveWarned) {
+    saveWarned = true;
+    alert("Could not save to this browser (storage may be full or blocked). Use Export now to keep your data.");
+  }
   renderAll();
 }
 
@@ -46,8 +52,14 @@ function populateSelects() {
   populateSelect($("transactionCategory"), state.categories, "Select category");
 }
 
+function accountExists(id) { return state.accounts.some(a => a.id === id); }
+function categoryExists(id) { return state.categories.some(c => c.id === id); }
+
 function openModal(id) { $(id).classList.remove("hidden"); }
-function closeModal(id) { $(id).classList.add("hidden"); }
+function closeModal(id) {
+  $(id).classList.add("hidden");
+  if (id === "itemModal") pendingSelectId = null;
+}
 
 function resetTransactionForm() {
   editingTransactionId = null;
@@ -91,6 +103,8 @@ function openTransaction(id = null) {
 
 function handleAddNewSelect(select, type) {
   if (select.value !== "__ADD_NEW__") return false;
+  select.value = "";
+  pendingSelectId = select.id;
   itemMode = type;
   $("itemModalTitle").textContent = type === "account" ? "Add Account" : "Add Category";
   $("itemName").value = "";
@@ -114,12 +128,14 @@ $("transactionForm").addEventListener("submit", e => {
   const type = $("transactionType").value;
   const amount = Number($("transactionAmount").value);
   if (!validAmount(amount)) return alert("Enter a valid amount.");
+  if (!isValidDate($("transactionDate").value)) return alert("Enter a valid date.");
 
   let transaction;
   if (type === "transfer") {
     const from = $("transferFromAccount").value;
     const to = $("transferToAccount").value;
     if (!from || !to || from === to) return alert("Choose two different accounts for a transfer.");
+    if (!accountExists(from) || !accountExists(to)) return alert("Choose valid accounts for the transfer.");
     transaction = {
       id: editingTransactionId || crypto.randomUUID(),
       date: $("transactionDate").value,
@@ -135,6 +151,7 @@ $("transactionForm").addEventListener("submit", e => {
     const accountId = $("transactionAccount").value;
     const categoryId = $("transactionCategory").value;
     if (!accountId || !categoryId) return alert("Select an account and category.");
+    if (!accountExists(accountId) || !categoryExists(categoryId)) return alert("Select a valid account and category.");
     transaction = {
       id: editingTransactionId || crypto.randomUUID(),
       date: $("transactionDate").value,
@@ -150,6 +167,7 @@ $("transactionForm").addEventListener("submit", e => {
 
   if (editingTransactionId) {
     const index = state.transactions.findIndex(t => t.id === editingTransactionId);
+    if (index === -1) return alert("This transaction no longer exists.");
     state.transactions[index] = transaction;
   } else {
     state.transactions.push(transaction);
@@ -229,13 +247,16 @@ $("itemForm").addEventListener("submit", e => {
   const check = uniqueName($("itemName").value, collection.map(x => x.name));
   if (!check.ok) return alert(check.message);
 
+  const newId = crypto.randomUUID();
   if (itemMode === "account") {
-    state.accounts.push({ id: crypto.randomUUID(), name: check.name, openingBalance: 0 });
+    state.accounts.push({ id: newId, name: check.name, openingBalance: 0 });
   } else {
-    state.categories.push({ id: crypto.randomUUID(), name: check.name });
+    state.categories.push({ id: newId, name: check.name });
   }
 
+  const targetSelectId = pendingSelectId;
   persistAndRender();
+  if (targetSelectId) $(targetSelectId).value = newId;
   closeModal("itemModal");
 });
 
@@ -267,12 +288,22 @@ $("importFileInput").addEventListener("change", async e => {
   const file = e.target.files[0];
   if (!file) return;
   try {
-    const imported = JSON.parse(await file.text());
-    if (!imported || imported.version !== 1 || !Array.isArray(imported.accounts) || !Array.isArray(imported.transactions)) {
-      throw new Error("Invalid Obsidian Finance backup.");
+    let parsed;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      throw new Error("The file is not valid JSON.");
     }
-    state = imported;
-    saveState(state);
+    const { state: clean, dropped } = normalizeState(parsed);
+
+    const summary = `Replace your current data (${state.transactions.length} transactions) with this backup (${clean.transactions.length} transactions)?`
+      + (dropped ? `\n\n${dropped} damaged transaction${dropped === 1 ? "" : "s"} in the file will be skipped.` : "")
+      + "\n\nYour current data is kept as a safety copy in this browser.";
+    if (!confirm(summary)) return;
+
+    backupBeforeImport(state);
+    state = clean;
+    if (!saveState(state)) alert("Imported, but the browser could not save it. Use Export now to keep your data.");
     renderAll();
     alert("Backup imported successfully.");
   } catch (error) {
@@ -293,3 +324,4 @@ function escapeHTML(value) {
 }
 
 renderAll();
+if (loaded.notice) setTimeout(() => alert(loaded.notice), 0);

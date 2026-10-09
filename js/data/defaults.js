@@ -12,7 +12,6 @@ export const DEFAULT_SETTINGS = {
 
 export const STORAGE_KEYS = {
   state: "obsidian_finance_state",
-  legacyTransactions: "obsidian_finance_transactions",
-  legacyBalances: "obsidian_finance_opening_balances",
-  legacyBudgets: "obsidian_finance_budgets"
+  corruptBackup: "obsidian_finance_corrupt_backup",
+  preImportBackup: "obsidian_finance_pre_import_backup"
 };

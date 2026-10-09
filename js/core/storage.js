@@ -1,4 +1,5 @@
 import { STORAGE_KEYS, DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from "../data/defaults.js";
+import { normalizeState } from "./validators.js";
 
 const blankState = () => ({
   version: 1,
@@ -9,62 +10,50 @@ const blankState = () => ({
   budgets: {}
 });
 
-function migrateLegacy() {
-  const oldTransactions = JSON.parse(localStorage.getItem(STORAGE_KEYS.legacyTransactions) || "null");
-  const oldBalances = JSON.parse(localStorage.getItem(STORAGE_KEYS.legacyBalances) || "null");
-  const oldBudgets = JSON.parse(localStorage.getItem(STORAGE_KEYS.legacyBudgets) || "null");
-
-  if (!Array.isArray(oldTransactions) && !oldBalances && !oldBudgets) return null;
-
-  const state = blankState();
-  const accountNames = new Set(Object.keys(oldBalances || {}));
-  oldTransactions?.forEach(t => {
-    if (t.account) accountNames.add(t.account);
-    if (t.fromAccount) accountNames.add(t.fromAccount);
-    if (t.toAccount) accountNames.add(t.toAccount);
-  });
-
-  state.accounts = [...accountNames].map(name => ({
-    id: crypto.randomUUID(),
-    name,
-    openingBalance: Number(oldBalances?.[name] || 0)
-  }));
-
-  const accountIdByName = Object.fromEntries(state.accounts.map(a => [a.name, a.id]));
-  const categoryNames = new Set(state.categories.map(c => c.name));
-  oldTransactions?.forEach(t => t.category && categoryNames.add(t.category));
-  state.categories = [...categoryNames].map(name => ({ id: crypto.randomUUID(), name }));
-  const categoryIdByName = Object.fromEntries(state.categories.map(c => [c.name, c.id]));
-
-  state.transactions = (oldTransactions || []).map(t => ({
-    id: t.id || crypto.randomUUID(),
-    date: t.date,
-    type: String(t.type || "expense").toLowerCase(),
-    accountId: accountIdByName[t.account] || null,
-    fromAccountId: accountIdByName[t.fromAccount] || null,
-    toAccountId: accountIdByName[t.toAccount] || null,
-    categoryId: categoryIdByName[t.category] || null,
-    description: t.description || "",
-    amount: Number(t.amount) || 0
-  }));
-
-  Object.entries(oldBudgets || {}).forEach(([categoryName, amount]) => {
-    const categoryId = categoryIdByName[categoryName];
-    if (categoryId) state.budgets[categoryId] = Number(amount) || 0;
-  });
-
-  return state;
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
+/**
+ * Returns { state, notice }. Never throws and never discards stored data:
+ * if the stored state is unreadable, the raw text is copied to a backup key
+ * and the app starts blank with a visible notice.
+ */
 export function loadState() {
-  const current = JSON.parse(localStorage.getItem(STORAGE_KEYS.state) || "null");
-  if (current) return current;
-  const migrated = migrateLegacy();
-  return migrated || blankState();
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEYS.state);
+  } catch {
+    return { state: blankState(), notice: "Browser storage is unavailable. Changes will not be saved. Use Export to keep your data." };
+  }
+  if (raw === null) return { state: blankState(), notice: null };
+
+  try {
+    const { state, dropped } = normalizeState(JSON.parse(raw));
+    const notice = dropped > 0
+      ? `${dropped} damaged transaction${dropped === 1 ? " was" : "s were"} removed while loading.`
+      : null;
+    return { state, notice };
+  } catch {
+    safeSet(STORAGE_KEYS.corruptBackup, raw);
+    return {
+      state: blankState(),
+      notice: "Saved data could not be read, so the app started empty. A copy of the unreadable data was kept in this browser."
+    };
+  }
 }
 
 export function saveState(state) {
-  localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
+  return safeSet(STORAGE_KEYS.state, JSON.stringify(state));
+}
+
+export function backupBeforeImport(state) {
+  return safeSet(STORAGE_KEYS.preImportBackup, JSON.stringify(state));
 }
 
 export function exportState(state) {
