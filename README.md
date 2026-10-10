@@ -73,11 +73,9 @@ obsidian-finance/
 │   │   └── budgets.js
 │   └── charts/
 │       └── charts.js
-├── assets/
-│   └── icons/
 └── data/
     └── .gitkeep
-```
+
 
 ## Data Model
 
@@ -161,6 +159,13 @@ Obsidian Finance is:
 - Extensible
 
 It is not intended to replace a bank, accounting platform, tax system, or regulated financial service.
+
+## Know limitations (V1)
+
+- Accounts ans categories can be added but not renamed or deleted
+- Opening balances connaot be negative
+- Runway uses the current month's spendings only
+- Data lives in this browser only. use Export regularly to keep a backup
 
 ## Roadmap
 
