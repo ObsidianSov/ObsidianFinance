@@ -3,39 +3,49 @@ import { formatMoney } from "../ui/dashboard.js";
 
 let charts = {};
 
-const NEON = {
-  cyan: "#00e5ff", magenta: "#ff2bd6", violet: "#8b5cff", green: "#38ffb0", red: "#ff4d79", amber: "#ffc857", blue: "#3d8bff", pink: "#ff7ad9"
+const COLORS = {
+  accent: "#3dd9ff", violet: "#8b7bff", green: "#34d399", red: "#ff6b81",
+  amber: "#fbbf24", blue: "#5b8cff", pink: "#f472b6", lime: "#a3e635"
 };
-const PALETTE = [NEON.cyan, NEON.magenta, NEON.violet, NEON.green, NEON.amber, NEON.blue, NEON.red, NEON.pink];
-const BG = "#04050d";
-const MONO = "'Share Tech Mono', ui-monospace, Consolas, monospace";
+const PALETTE = [COLORS.accent, COLORS.violet, COLORS.green, COLORS.amber, COLORS.red, COLORS.blue, COLORS.pink, COLORS.lime];
+const SURFACE = "#0e1116";
+const FONT = "Inter, 'Segoe UI', system-ui, sans-serif";
+const MUTED = "#8f99a8";
+const GRID = "rgba(255, 255, 255, .06)";
 
-const tooltip = {
-  backgroundColor: "rgba(4, 6, 18, .94)", borderColor: "rgba(0, 229, 255, .5)", borderWidth: 1,
-  titleColor: NEON.cyan, bodyColor: "#e8f6ff", padding: 10, cornerRadius: 4, displayColors: true,
-  titleFont: { family: MONO }, bodyFont: { family: MONO }
-};
-const legend = { labels: { color: "#9db4d6", usePointStyle: true, boxWidth: 8, font: { family: MONO } } };
+function compactMoney(value, settings) {
+  const compact = new Intl.NumberFormat(settings.locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+  return `${settings.currencySymbol || ""}${compact}`;
+}
 
-const baseOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend, tooltip },
-  scales: {
-    x: { ticks: { color: "#7d92b4", font: { family: MONO } }, grid: { color: "rgba(0, 229, 255, .07)" }, border: { color: "rgba(0, 229, 255, .25)" } },
-    y: { ticks: { color: "#7d92b4", font: { family: MONO } }, grid: { color: "rgba(0, 229, 255, .07)" }, border: { color: "rgba(0, 229, 255, .25)" } }
-  }
-};
+function tooltip(settings, valueKey) {
+  return {
+    backgroundColor: "#141920", borderColor: "#2d3541", borderWidth: 1, cornerRadius: 10, padding: 12,
+    titleColor: "#f4f6f9", bodyColor: "#c5ccd8", titleFont: { family: FONT, weight: "600" }, bodyFont: { family: FONT },
+    boxPadding: 4,
+    callbacks: { label: ctx => ` ${ctx.dataset.label ? ctx.dataset.label + ": " : ""}${formatMoney(ctx.parsed[valueKey] ?? ctx.parsed, settings)}` }
+  };
+}
 
-const doughnutOptions = { responsive: true, maintainAspectRatio: false, cutout: "68%", plugins: { legend, tooltip } };
+function legend() {
+  return { labels: { color: "#aab3c0", usePointStyle: true, pointStyle: "circle", boxWidth: 7, boxHeight: 7, padding: 16, font: { family: FONT, size: 12 } } };
+}
+
+function axes(settings) {
+  const common = { border: { display: false }, ticks: { color: MUTED, font: { family: FONT, size: 11 } } };
+  return {
+    x: { ...common, grid: { display: false }, ticks: { ...common.ticks, maxTicksLimit: 7, maxRotation: 0 } },
+    y: { ...common, grid: { color: GRID }, ticks: { ...common.ticks, maxTicksLimit: 6, callback: v => compactMoney(v, settings) } }
+  };
+}
 
 function areaGradient(context) {
   const { chart } = context;
   const { ctx, chartArea } = chart;
-  if (!chartArea) return "rgba(0, 229, 255, .15)";
+  if (!chartArea) return "rgba(61, 217, 255, .12)";
   const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-  g.addColorStop(0, "rgba(0, 229, 255, .38)");
-  g.addColorStop(1, "rgba(0, 229, 255, 0)");
+  g.addColorStop(0, "rgba(61, 217, 255, .26)");
+  g.addColorStop(1, "rgba(61, 217, 255, 0)");
   return g;
 }
 
@@ -45,6 +55,7 @@ function destroy(name) {
 
 export function renderCharts(state) {
   if (!window.Chart) return;
+  const settings = state.settings;
 
   destroy("equity");
   const equity = getEquitySeries(state);
@@ -52,9 +63,17 @@ export function renderCharts(state) {
     type: "line",
     data: {
       labels: equity.map(x => x.label),
-      datasets: [{ label: "Total Cash", data: equity.map(x => x.value), tension: .35, borderWidth: 2.5, borderColor: NEON.cyan, backgroundColor: areaGradient, fill: true, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: NEON.cyan, pointBorderColor: BG }]
+      datasets: [{
+        label: "Total Cash", data: equity.map(x => x.value), tension: .35, borderWidth: 2, borderColor: COLORS.accent,
+        backgroundColor: areaGradient, fill: true, pointRadius: 0, pointHoverRadius: 5,
+        pointHoverBackgroundColor: COLORS.accent, pointHoverBorderColor: SURFACE, pointHoverBorderWidth: 3
+      }]
     },
-    options: { ...baseOptions }
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false }, tooltip: tooltip(settings, "y") },
+      scales: axes(settings)
+    }
   });
 
   destroy("cashflow");
@@ -64,11 +83,15 @@ export function renderCharts(state) {
     data: {
       labels: flow.map(x => x.label),
       datasets: [
-        { label: "Income", data: flow.map(x => x.income), borderWidth: 1.5, borderColor: NEON.green, backgroundColor: "rgba(56, 255, 176, .35)", borderRadius: 3 },
-        { label: "Expenses", data: flow.map(x => x.expenses), borderWidth: 1.5, borderColor: NEON.red, backgroundColor: "rgba(255, 77, 121, .35)", borderRadius: 3 }
+        { label: "Income", data: flow.map(x => x.income), backgroundColor: COLORS.green, borderRadius: 6, borderSkipped: false, barPercentage: .75, categoryPercentage: .7 },
+        { label: "Expenses", data: flow.map(x => x.expenses), backgroundColor: COLORS.red, borderRadius: 6, borderSkipped: false, barPercentage: .75, categoryPercentage: .7 }
       ]
     },
-    options: { ...baseOptions }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: legend(), tooltip: tooltip(settings, "y") },
+      scales: axes(settings)
+    }
   });
 
   const spend = getCategorySpend(state);
@@ -80,9 +103,9 @@ export function renderCharts(state) {
       type: "doughnut",
       data: {
         labels: categories.map(c => c.name),
-        datasets: [{ data: categories.map(c => spend[c.id]), backgroundColor: categories.map((_, i) => PALETTE[i % PALETTE.length]), borderColor: BG, borderWidth: 3, hoverOffset: 8 }]
+        datasets: [{ data: categories.map(c => spend[c.id]), backgroundColor: categories.map((_, i) => PALETTE[i % PALETTE.length]), borderColor: SURFACE, borderWidth: 4, hoverOffset: 6 }]
       },
-      options: doughnutOptions
+      options: { responsive: true, maintainAspectRatio: false, cutout: "74%", plugins: { legend: legend(), tooltip: tooltip(settings, "") } }
     });
   }
 
@@ -95,9 +118,9 @@ export function renderCharts(state) {
       type: "doughnut",
       data: {
         labels: accounts.map(a => a.name),
-        datasets: [{ data: accounts.map(a => Math.max(0, balances[a.id] || 0)), backgroundColor: accounts.map((_, i) => PALETTE[i % PALETTE.length]), borderColor: BG, borderWidth: 3, hoverOffset: 8 }]
+        datasets: [{ data: accounts.map(a => Math.max(0, balances[a.id] || 0)), backgroundColor: accounts.map((_, i) => PALETTE[i % PALETTE.length]), borderColor: SURFACE, borderWidth: 4, hoverOffset: 6 }]
       },
-      options: doughnutOptions
+      options: { responsive: true, maintainAspectRatio: false, cutout: "74%", plugins: { legend: legend(), tooltip: tooltip(settings, "") } }
     });
   }
 }
